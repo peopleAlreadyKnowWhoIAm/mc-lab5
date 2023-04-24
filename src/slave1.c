@@ -15,7 +15,7 @@ int main() {
     while (RS485Busy(rs)) {
    }
     RS485WriteWithError(rs, buf, -1, 0b1);
-    rs->buffer[0] ^= 0b1;
+    // rs->buffer[0] ^= 0b1;
 
     while (RS485Busy(rs)) {
     }

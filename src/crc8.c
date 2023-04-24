@@ -15,9 +15,10 @@ inline static uint8_t calculate_for_byte(uint8_t data) {
 }
 
 void Crc8InitTable() {
-  for(uint8_t i = 0; i <= 0xff; i++) {
+  for(uint8_t i = 0; i < 0xff; i++) {
     crc_table[i] = calculate_for_byte(i);
   }
+  crc_table[0xff] = calculate_for_byte(0xff);
 }
 
 bool Crc8Check(uint8_t data[6]) {
