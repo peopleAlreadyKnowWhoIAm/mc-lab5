@@ -7,6 +7,7 @@ int main() {
   MCC* rs = MCCInit(USART1, RS485_BR, MCC_MASTER,
                     (Pin){.gpio = GPIOD, .pin_number = 4});
   Usart* usrt = UsartInit(USART0, RS232_BR);
+  Crc8InitTable();
   sei();
   char buf[200] = {0};
   while (1) {
@@ -35,7 +36,7 @@ int main() {
       // strcat(buf, a);
       memcpy(&buf[tbuf.len], sbuf.str, sbuf.len);
 
-      UsartWriteChars(usrt, sbuf.str, sbuf.len);
+      UsartWriteChars(usrt, buf, sbuf.len + tbuf.len);
       while (UsartWriteBusy(usrt)) {
       }
     }
