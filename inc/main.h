@@ -13,4 +13,6 @@
 #include "string.h"
 #include "rs485.h"
 #include "usart.h"
+#include "pcf2123.h"
+
 #endif

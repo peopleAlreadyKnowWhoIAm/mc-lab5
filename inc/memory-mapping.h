@@ -31,11 +31,19 @@ typedef struct TimerGP8MemoryMapping {
     io_t* TIFR;
 } TimerGP8MemoryMapping;
 
+typedef struct SPIMemoryMapping {
+    io_t spcr;
+    io_t spsr;
+    io_t spdr;
+} SPIMemoryMapping;
+
 typedef struct Gpio {
     io_t PIN;
     io_t DDB;
     io_t PORT;
 } Gpio;
+
+#define SPI0 ((SPIMemoryMapping*) 0x4c)
 
 #if defined (__AVR_ATmega328P__) || defined (__AVR_ATmega328__)
 #define TIMER0 (TimerGP8MemoryMapping) { \
