@@ -1,41 +1,20 @@
 #include "multi-cpu-connection.h"
 
-static MCC_internal *mcc_inter;
+static MCC *mcc_usart0;
 
-static volatile uint8_t timer_counter = 0;
 
-static volatile uint8_t timer_end_reception_event = 0;
-
-static void init_transmition(MCC_internal *control) {
-  control->direction_pin.gpio->PORT |= _BV(control->direction_pin.pin_number);
-  control->mapping->UCSRB |= _BV(TXEN0) | _BV(UDRIE0);
-}
-
-static void end_reception(MCC_internal *control) {
+static void end_reception(MCC *control) {
   // Clear intterupts
   TimerGP8EnableInterupts(control->timer, 0);
 
-  // Disable rx
   control->mapping->UCSRB &= ~(_BV(RXEN0) | _BV(RXCIE0));
-
-  // Change state
-  // if (control->pdata.eararchy == MCC_SLAVE)
-  // {
-  if (control->pdata.status != MCC_PENDING_ADRESS) {
-    control->pdata.status = MCC_IDLE_CONNECTED;
+  if (control->status != MCC_PENDING_ADRESS) {
+    control->status = MCC_IDLE_CONNECTED;
   } else {
-    control->pdata.status = MCC_IDLE_DISCONNECTED;
+    control->status = MCC_IDLE_DISCONNECTED;
   }
-  // }
-  // else
-  // {
-  //   control->pdata.status = MCC_PENDING_ADRESS;
-  // }
-  // control->pdata.rx[control->rx_pos] = '\0';
-  // control->rx_pos++;
+  control->buffer_data_size = control->buffer_pos;
 }
-
-static TimerGP8MemoryMapping timer_m = TIMER0;
 
 MCC *MCCInit(UsartMemoryMapping *usart, const uint32_t baudrate,
              MCCEararchy eararchy, Pin direction_pin) {
@@ -53,58 +32,57 @@ MCC *MCCInit(UsartMemoryMapping *usart, const uint32_t baudrate,
     usart->UCSRB |= _BV(RXEN0) | _BV(RXCIE0);
   }
 
-  MCC_internal *control = malloc(sizeof(MCC_internal));
-  control->b_pos = 0;
+  MCC *control = malloc(sizeof(MCC));
+  control->buffer_pos = 0;
   control->mapping = usart;
-  control->pdata.eararchy = eararchy;
-  control->pdata.address = 0;
-  control->pdata.receive_fault = false;
+  control->eararchy = eararchy;
+  control->address = 0;
+  control->receive_fault = false;
   control->direction_pin = direction_pin;
-  control->pdata.status =
+  control->status =
       (eararchy == MCC_MASTER) ? MCC_IDLE_DISCONNECTED : MCC_PENDING_ADRESS;
-  control->timer = TimerGP8Init(&timer_m, TimerPrescaller_1024, 0, 0);
 
   control->direction_pin.gpio->DDB |= _BV(control->direction_pin.pin_number);
   control->direction_pin.gpio->PORT &= ~_BV(control->direction_pin.pin_number);
 
   // May switch in future
-  mcc_inter = control;
-  return &control->pdata;
+  mcc_usart0 = control;
+  return control;
 }
 
 int8_t MCCMasterSendAddress(MCC *rs, uint8_t address) {
-  if ((rs->status != MCC_IDLE_DISCONNECTED && rs->status != MCC_IDLE_CONNECTED) || rs->eararchy != MCC_MASTER) {
+  if ((rs->status != MCC_IDLE_DISCONNECTED &&
+       rs->status != MCC_IDLE_CONNECTED) ||
+      rs->eararchy != MCC_MASTER) {
     return -1;
   }
   rs->address = address;
   rs->status = MCC_PENDING_ADRESS;
-  MCC_internal *control = (MCC_internal *)rs;
-  control->direction_pin.gpio->PORT |= _BV(control->direction_pin.pin_number);
-  control->mapping->UCSRB |= _BV(TXEN0);
-  control->mapping->UCSRB |= _BV(TXB80);
-  control->mapping->UDR = rs->address;
-  control->mapping->UCSRB |= _BV(TXCIE0);
+  rs->direction_pin.gpio->PORT |= _BV(rs->direction_pin.pin_number);
+  rs->mapping->UCSRB |= _BV(TXEN0);
+  rs->mapping->UCSRB |= _BV(TXB80);
+  rs->mapping->UDR = rs->address;
+  rs->mapping->UCSRB |= _BV(TXCIE0);
   return 0;
 }
 
-void data_received(MCC_internal *control) {
+void data_received(MCC *control) {
   // Error in receive
   if (control->mapping->UCSRA & (_BV(FE0) | _BV(DOR0) | _BV(UPE0))) {
-    control->pdata.receive_fault = true;
+    control->receive_fault = true;
   }
   // Slave got address
-  if (control->pdata.eararchy == MCC_SLAVE &&
+  if (control->eararchy == MCC_SLAVE &&
       control->mapping->UCSRB & _BV(RXB80)) {
     uint8_t address = control->mapping->UDR;
-      TimerGP8EnableInterupts(control->timer, 0);
 
-    if (control->pdata.address == address) {
+    if (control->address == address) {
       // Earlier for pause
       // Enable Tx complited intterupt and send confirm signal
       control->mapping->UCSRB |= _BV(TXEN0);
 
-      control->pdata.status = MCC_PENDING_ADRESS;
-      
+      control->status = MCC_PENDING_ADRESS;
+
       control->direction_pin.gpio->PORT |=
           _BV(control->direction_pin.pin_number);
 
@@ -118,62 +96,55 @@ void data_received(MCC_internal *control) {
       // Not this address
       // Ifcontr has been data trasfer -> enable MPCM
       control->mapping->UCSRA |= _BV(MPCM0);
-      control->pdata.status = MCC_PENDING_ADRESS;
+      control->status = MCC_PENDING_ADRESS;
     }
   } else {
     // Rezero timer
-    timer_end_reception_event = timer_counter + 4;
+    control->receive_timestamp = CounterGetCount() + 4;
 
     uint8_t buf = control->mapping->UDR;
 
-    if (control->pdata.status == MCC_LISTENING) {
-      control->pdata.status = MCC_RECEIVING;
+    if (control->status == MCC_LISTENING) {
+      control->status = MCC_RECEIVING;
       // Start timer
-      TimerGP8EnableInterupts(control->timer, TOIE);
+      // TimerGP8EnableInterupts(control->timer, TOIE);
     }
 
-    if (control->pdata.eararchy == MCC_MASTER &&
-        control->pdata.status == MCC_PENDING_ADRESS) {
-        //Disable reception
-        control->mapping->UCSRB &= ~(_BV(RXEN0) | _BV(RXCIE0));
+    if (control->eararchy == MCC_MASTER &&
+        control->status == MCC_PENDING_ADRESS) {
+      // Disable reception
+      control->mapping->UCSRB &= ~(_BV(RXEN0) | _BV(RXCIE0));
       // Adress set right
-      TimerGP8EnableInterupts(control->timer, 0);
-      control->pdata.status = MCC_IDLE_CONNECTED;
-      if (buf == control->pdata.address) {
+      control->status = MCC_IDLE_CONNECTED;
+      if (buf == control->address) {
         // Coneection was established
 
-        control->pdata.status = MCC_IDLE_CONNECTED;
+        control->status = MCC_IDLE_CONNECTED;
       } else {
-        control->pdata.status = MCC_IDLE_CONNECTED;
+        control->status = MCC_IDLE_CONNECTED;
         // Resend address
-        // MCCMasterSendAddress(&control->pdata, control->pdata.address);
+        MCCMasterSendAddress(control, control->address);
       }
     } else {
-      // End of receive frame
-      // if (buf == '\0') {
-      //   end_reception(control);
-      // } else {
-      control->pdata.buffer[control->b_pos] = buf;
-      control->b_pos++;
-      // }
+      control->buffer[control->buffer_pos] = buf;
+      control->buffer_pos++;
     }
   }
 }
 
-void data_tx_empty(MCC_internal *control) {
+void data_tx_empty(MCC *control) {
   // Send data
-  if (control->b_pos == 0) {
-    // Write ending \0
+  if (control->buffer_pos == control->buffer_data_size) {
     control->mapping->UCSRB &=
         ~(1 << UDRIE0);  // Disable iterrupt when not transmitting data
     control->mapping->UCSRB |= _BV(TXCIE0);  // Enable complition intterupt
   } else {
-    control->b_pos--;
-    control->mapping->UDR = control->pdata.buffer[control->b_pos];
+    control->mapping->UDR = control->buffer[control->buffer_pos];
+    control->buffer_pos++;
   }
 }
 
-void data_tx_completed(MCC_internal *control) {
+void data_tx_completed(MCC *control) {
   // disable interrupt and clear 9th bit and disable transmitter
   control->mapping->UCSRB &= ~(_BV(TXCIE0) | _BV(TXB80) | _BV(TXEN0));
 
@@ -182,21 +153,18 @@ void data_tx_completed(MCC_internal *control) {
   // Enable rx and ex intterupt
   control->mapping->UCSRB |= _BV(RXEN0) | _BV(RXCIE0);
 
-  // Clear buffer
-  control->b_pos = 0;
+  control->buffer_pos = 0;
 
   // Start listening
-  if (control->pdata.eararchy == MCC_MASTER &&
-      control->pdata.status == MCC_PENDING_ADRESS) {
-    timer_end_reception_event = timer_counter + 2;
+  if (control->eararchy == MCC_MASTER &&
+      control->status == MCC_PENDING_ADRESS) {
+    // timer_end_reception_event = timer_counter + 2;
     // Start timeout
     // TimerGP8EnableInterupts(control->timer, TOIE);
   } else {
-    control->pdata.status = MCC_LISTENING;
+    control->status = MCC_LISTENING;
   }
 }
-
-
 
 ISR(
 #ifdef __AVR_ATmega2560__
@@ -205,7 +173,7 @@ ISR(
     USART_RX_vect
 #endif
 ) {
-  data_received(mcc_inter);
+  data_received(mcc_usart0);
 }
 
 ISR(
@@ -216,7 +184,7 @@ ISR(
 #endif
 
 ) {
-  data_tx_empty(mcc_inter);
+  data_tx_empty(mcc_usart0);
 }
 
 ISR(
@@ -227,14 +195,7 @@ ISR(
 #endif
 
 ) {
-  data_tx_completed(mcc_inter);
-}
-
-ISR(TIMER0_OVF_vect) {
-  timer_counter++;
-  if (timer_counter == timer_end_reception_event) {
-    end_reception(mcc_inter);
-  }
+  data_tx_completed(mcc_usart0);
 }
 
 int8_t MCCWrite(MCC *rs485, uint8_t len) {
@@ -243,10 +204,11 @@ int8_t MCCWrite(MCC *rs485, uint8_t len) {
   }
   rs485->status = MCC_SENDING;
 
-  MCC_internal *mcc = (MCC_internal *)rs485;
-  mcc->b_pos = len;
-  init_transmition(mcc);
+  rs485->buffer_data_size = len;
+  rs485->buffer_pos = 0;
   // data_tx_empty(control);
+  rs485->direction_pin.gpio->PORT |= _BV(rs485->direction_pin.pin_number);
+  rs485->mapping->UCSRB |= _BV(TXEN0) | _BV(UDRIE0);
   return 0;
 }
 
@@ -257,11 +219,20 @@ char *MCCGetBuffer(MCC *mcc) {
   return mcc->buffer;
 }
 
-String MCCRead(MCC *rs485) {
+uint8_t MCCGetDataLength(MCC *rs485) {
   if (rs485->status != MCC_IDLE_CONNECTED) {
-    return (String){.len = 0};
+    return 0;
   }
-  return (String){.len = ((MCC_internal *)rs485)->b_pos, .str = rs485->buffer};
+  return rs485->buffer_data_size;
 }
 
+bool MCCBusy(MCC* mcc){
+  // Recheck receiving completion
+  if(mcc->status == MCC_RECEIVING && CounterGetCount() - mcc->receive_timestamp >= 0){
+    end_reception(mcc);
+  }
+  return !(mcc->status == MCC_IDLE_CONNECTED ||
+          mcc->status == MCC_IDLE_DISCONNECTED);
+
+}
 void MCCFree(MCC *rs485) { free(rs485); }

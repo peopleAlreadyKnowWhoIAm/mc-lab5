@@ -15,37 +15,11 @@ int8_t RS485MasterSendAddress(RS485* master, uint8_t address) {
   return MCCMasterSendAddress(master, address);
 }
 
-int8_t prepare_text_for_sending(char* target, const char* text){
-  uint8_t tx_len = (strlen(text) + 4) / 5 * 6;
-  uint8_t tx_indx = tx_len - 1;
-  if (tx_len > MCC_BUFFER_SIZE) {
-    return -1;
-  }
-  uint8_t sub_buf[5];
-  uint8_t sub_buf_idx = 0;
-  while (*text != '\0' || sub_buf_idx != 0) {
-    sub_buf[sub_buf_idx] = *text;
-    target[tx_indx] = *text;
-    tx_indx--;
-    sub_buf_idx++;
-    if (*text != '\0') {
-      text++;
-    }
-    if (sub_buf_idx == 5) {
-      uint8_t crc = Crc8Calculate(sub_buf);
-      sub_buf_idx = 0;
-      target[tx_indx] = crc;
-      tx_indx--;
-    }
-  }
-
-  return tx_len;
-}
 
 int8_t RS485Write(RS485* rs, const char* text) {
   char* tx = MCCGetBuffer(rs);
-  int8_t len = prepare_text_for_sending(tx,text);
-  if(len < 0 ){
+  int8_t len = Crc8Encode(tx,text);
+  if(len == 0 ){
     return -1;
   }
 
@@ -55,8 +29,8 @@ int8_t RS485Write(RS485* rs, const char* text) {
 int8_t RS485WriteWithError(RS485* rs, const char* text, int8_t error_byte, uint8_t error_mask){
 
   char* tx = MCCGetBuffer(rs);
-  int8_t len = prepare_text_for_sending(tx,text);
-  if(len < 0 ){
+  int8_t len = Crc8Encode(tx,text);
+  if(len == 0 ){
     return -1;
   }
   uint8_t pos;
@@ -72,38 +46,22 @@ int8_t RS485WriteWithError(RS485* rs, const char* text, int8_t error_byte, uint8
 }
 
 int8_t RS485Read(RS485* mcc, char* output_buf) {
-  String readed = MCCRead(mcc);
-  uint8_t out_indx = 0;
-  uint8_t pos = 0;
-  if (readed.len == 0) {
-    return -1;
-  }
-  uint8_t sub_buf[6];
-  while (pos != readed.len && !mcc->receive_fault) {
-    sub_buf[pos % 6] = readed.str[pos];
-    if (pos % 6 == 5) {
-      mcc->receive_fault = !Crc8Check(sub_buf);
-    } else {
-      output_buf[out_indx] = readed.str[pos];
-      out_indx++;
-    }
-    pos++;
-  }
-
+  char* buffer = MCCGetBuffer(mcc);
+  uint8_t len = MCCGetDataLength(mcc);
   if (mcc->receive_fault) {
-    output_buf[0] = '\0';
     return -2;
   }
+  
+  if(len == 0){
+    return -1;
+  }
 
-  output_buf[out_indx] = '\0';
-  return 0;
+  uint8_t res_len = Crc8Decode(output_buf, buffer, len);
+  return res_len;
 }
 
 bool RS485Busy(RS485* rs) {
-  return (rs->status == MCC_IDLE_CONNECTED ||
-          rs->status == MCC_IDLE_DISCONNECTED)
-             ? false
-             : true;
+  return MCCBusy(rs);
 }
 
 void RS485Free(RS485* rs) {

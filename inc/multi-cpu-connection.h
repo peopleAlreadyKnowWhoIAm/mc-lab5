@@ -38,7 +38,7 @@
 
 #include "memory-mapping.h"
 #include "crc8.h"
-#include "timer.h"
+#include "counter.h"
 #include "gpio.h"
 
 #define BUSY_TX(usart) (!(usart->UCSRA & _BV(UDRE0)))
@@ -74,18 +74,16 @@ typedef struct {
   MCCEararchy eararchy : 1;
   bool receive_fault;
   uint8_t address;  // In master - target address, in slave - ic address
-} MCC;
-
-typedef struct {
-  MCC pdata;
-  // Hidden fields
+  uint8_t receive_timestamp;
+  
   UsartMemoryMapping* mapping;
 
   Pin direction_pin;
   // Text fragment must end with '\0' termination
-  uint8_t b_pos;
+  uint8_t buffer_pos;
+  uint8_t buffer_data_size;
   TimerGP8* timer;
-} MCC_internal;
+} MCC;
 
 MCC* MCCInit(UsartMemoryMapping* usart, const uint32_t baudrate,
                  MCCEararchy eararchy, Pin direction_pin);
@@ -98,7 +96,9 @@ int8_t MCCWrite(MCC* mcc, uint8_t len);
 
 char* MCCGetBuffer(MCC* mcc);
 // Returns 0 on failure
-String MCCRead(MCC* mcc);
+uint8_t MCCGetDataLength(MCC* mcc);
+
+bool MCCBusy(MCC* mcc);
 
 void MCCFree(MCC* mcc);
 

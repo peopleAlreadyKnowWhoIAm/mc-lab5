@@ -37,6 +37,7 @@ enum {
   SpiClockSampleSetupLeading = 0b1000,
 };
 
+ // SCK and MOSI must be set ouput beforehand
 SPI* SPIInit(SPIMemoryMapping* mapping, SPIEararchy eararchy, SPIClock clock);
 
 bool SPIBusy(SPI* spi);

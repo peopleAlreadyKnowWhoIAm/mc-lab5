@@ -27,10 +27,17 @@ Usart* UsartInit(UsartMemoryMapping* usart, const uint32_t baudrate) {
   usart0.usart_mapping = usart;
   return &usart0;
 }
+
+static void read_byte(Usart* usart){
+  usart->receive_timestamp = CounterGetCount() +4;
+  usart->buffer.rx.buf[usart->buffer.rx.write] = usart->usart_mapping->UDR;
+  usart->buffer.rx.write = incptr(usart->buffer.rx.write);
+
+}
+
 #ifdef __AVR_ATmega2560__
 ISR(USART0_RX_vect) {
-  usart0.buffer.rx.buf[usart0.buffer.rx.write] = usart0.usart_mapping->UDR;
-  usart0.buffer.rx.write = incptr(usart0.buffer.rx.write);
+  read_byte(&usart0);
 }
 
 ISR(USART0_UDRE_vect){
@@ -100,13 +107,21 @@ int8_t UsartWriteChars(Usart* usart, const char * string, uint8_t len){
  *
  * @return next char from buffer. When empty - -1.
  */
-inline char UsartReadChar(Usart* usart) {
-  if (usart->buffer.rx.write != usart->buffer.rx.read) {
-    char tmp = usart->buffer.rx.buf[usart->buffer.rx.read];
+uint8_t UsartRead(Usart* usart, char* result) {
+  uint8_t result_pos = 0;
+  while (usart->buffer.rx.write != usart->buffer.rx.read) {
+    result[result_pos] = usart->buffer.rx.buf[usart->buffer.rx.read];
     usart->buffer.rx.read = incptr(usart->buffer.rx.read);
-    return tmp;
+    result_pos++;;
   }
-  return -1;
+  return result_pos;
+}
+
+bool UsartReadAvalaible(Usart* usart){
+  if(usart->buffer.rx.write != usart->buffer.rx.read && CounterGetCount() -  usart->receive_timestamp >= 0) {
+    return true;
+  }
+  return false;
 }
 
 bool UsartWriteBusy(Usart* usart) {

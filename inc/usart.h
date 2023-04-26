@@ -15,6 +15,8 @@ typedef struct {
 typedef struct {
     UsartMemoryMapping* usart_mapping;
     volatile UsartBuffer buffer;
+    // char buffer[128];
+    uint8_t receive_timestamp;
 } Usart;
 
 
@@ -26,7 +28,9 @@ int8_t UsartWriteChar(Usart* usart, const char data);
 int8_t UsartWriteChars(Usart* usart, const char* data, uint8_t len);
 int8_t UsartWrite(Usart* usart, const char* string);
 
-char UsartReadChar(Usart* usart);
+uint8_t UsartRead(Usart* usart, char*result);
+
+bool UsartReadAvalaible(Usart* usart);
 
 bool UsartWriteBusy(Usart* usart);
 
