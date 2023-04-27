@@ -29,7 +29,7 @@ Usart* UsartInit(UsartMemoryMapping* usart, const uint32_t baudrate) {
 }
 
 static void read_byte(Usart* usart){
-  usart->receive_timestamp = CounterGetCount() +4;
+  usart->receive_timestamp = CounterGetCount();
   usart->buffer.rx.buf[usart->buffer.rx.write] = usart->usart_mapping->UDR;
   usart->buffer.rx.write = incptr(usart->buffer.rx.write);
 
@@ -118,7 +118,7 @@ uint8_t UsartRead(Usart* usart, char* result) {
 }
 
 bool UsartReadAvalaible(Usart* usart){
-  if(usart->buffer.rx.write != usart->buffer.rx.read && CounterGetCount() -  usart->receive_timestamp >= 0) {
+  if(usart->buffer.rx.write != usart->buffer.rx.read && CounterGetCount() -  usart->receive_timestamp >= 4) {
     return true;
   }
   return false;

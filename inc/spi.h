@@ -24,13 +24,13 @@ typedef uint8_t SPIEararchy;
 typedef uint8_t SPIClock;
 
 enum {
-  SPI_master,
   SPI_slave,
+  SPI_master,
 };
 
 enum {
-  SPIClockDiv4 = 0,
-  SPIClockDiv16 = 0b1,
+  SpiClockDiv4 = 0,
+  SpiClockDiv16 = 0b1,
   SpiClockDiv64 = 0b10,
   SpiClockDiv128 = 0b11,
   SpiClockPolarityInverse = 0b100,

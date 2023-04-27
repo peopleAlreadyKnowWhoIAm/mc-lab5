@@ -22,7 +22,7 @@ void Crc8InitTable() {
 }
 
 bool Crc8Check(uint8_t data[6]) {
-  if(Crc8Calculate(data) == data[5]){
+  if(Crc8Calculate(data) == 0xD){
     return true;
   }
   return false;
@@ -36,7 +36,6 @@ uint8_t Crc8Calculate(uint8_t data[5]) {
 
   return crc ^ CRC8_XOR_OUT_WITH;
 }
-
 uint8_t Crc8Decode(char* result, const char* input, uint8_t input_length) {
   uint8_t out_indx = 0;
   uint8_t pos = 0;

@@ -100,7 +100,7 @@ void data_received(MCC *control) {
     }
   } else {
     // Rezero timer
-    control->receive_timestamp = CounterGetCount() + 4;
+    control->receive_timestamp = CounterGetCount();
 
     uint8_t buf = control->mapping->UDR;
 
@@ -228,11 +228,12 @@ uint8_t MCCGetDataLength(MCC *rs485) {
 
 bool MCCBusy(MCC* mcc){
   // Recheck receiving completion
-  if(mcc->status == MCC_RECEIVING && CounterGetCount() - mcc->receive_timestamp >= 0){
+  if(mcc->status == MCC_RECEIVING && CounterGetCount() - mcc->receive_timestamp >= 4){
     end_reception(mcc);
   }
   return !(mcc->status == MCC_IDLE_CONNECTED ||
           mcc->status == MCC_IDLE_DISCONNECTED);
 
 }
+
 void MCCFree(MCC *rs485) { free(rs485); }

@@ -8,6 +8,7 @@ int main() {
                     (Pin){.gpio = GPIOD, .pin_number = 4});
   Usart* usrt = UsartInit(USART0, RS232_BR);
   CounterInit();
+  Crc8InitTable();
   sei();
   char buf[100] = {0};
   uint8_t buf_pos = 0;
@@ -17,9 +18,10 @@ int main() {
       if (len % 6 != 0 && len > 6) {
         continue;
       }
-      char master_data[5];
+      char master_data[6];
       uint8_t master_data_len = Crc8Decode(master_data, buf, 6);
       if (master_data_len == 0) {
+        GPIOD->PORT |= 0b10;
         continue;
       }
 
