@@ -26,7 +26,7 @@ int main() {
     RS485Write(rs, buf);
     while (RS485Busy(rs)) {
     }
-    RS485WriteWithError(rs, buf, 4,0b00100101);
+    RS485WriteWithError(rs, buf, 3,0b00100101);
     
   }
   return 0;
