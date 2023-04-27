@@ -20,7 +20,7 @@ int8_t PCF2123WriteTime(SPI* spi, uint8_t* time, Pin* chip_enable){
   }
   uint8_t *buf = SPIGetBuffer(spi);
   buf[0] = PCF_MASK | PCF_SECONDS_ADDRESS;
-  memcpy(&buf[1], time, sizeof(uint8_t) * 7);
+  memcpy(&buf[1], time, 7);
   return SPIWrite(spi, 8, chip_enable);
 }
 

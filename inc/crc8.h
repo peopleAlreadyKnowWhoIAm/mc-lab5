@@ -18,7 +18,7 @@ bool Crc8Check(uint8_t data[6]);
 uint8_t Crc8Calculate(uint8_t data[5]);
 
 uint8_t Crc8Decode(char* result, const char* input, uint8_t input_length);
-uint8_t Crc8Encode(char* result, const char* input);
+uint8_t Crc8Encode(char* result, const uint8_t* input, const uint8_t len);
 
 
 #endif

@@ -22,7 +22,7 @@ void Crc8InitTable() {
 }
 
 bool Crc8Check(uint8_t data[6]) {
-  if(Crc8Calculate(data) == 0xD){
+  if(Crc8Calculate(data) == data[5]){
     return true;
   }
   return false;
@@ -61,21 +61,26 @@ uint8_t Crc8Decode(char* result, const char* input, uint8_t input_length) {
 }
 
 
-uint8_t Crc8Encode(char* result, const char* input)
+uint8_t Crc8Encode(char* result, const uint8_t* input, const uint8_t len)
 {
 
-  uint8_t tx_len = (strlen(input) + 4) / 5 * 6;
+  uint8_t tx_len = (len + 4) / 5 * 6;
   uint8_t tx_indx = 0;
+  uint8_t input_indx = 0;
   uint8_t sub_buf[5];
   uint8_t sub_buf_idx = 0;
-  while (*input != '\0' || sub_buf_idx != 0) {
-    sub_buf[sub_buf_idx] = *input;
-    result[tx_indx] = *input;
+  while (len != input_indx || sub_buf_idx != 0) {
+    uint8_t cur;
+    if (input_indx < len) {
+      cur = input[input_indx];
+      input_indx++;
+    } else {
+      cur = 0;
+    }
+    sub_buf[sub_buf_idx] = cur;
+    result[tx_indx] = cur;
     tx_indx++;
     sub_buf_idx++;
-    if (*input != '\0') {
-      input++;
-    }
     if (sub_buf_idx == 5) {
       uint8_t crc = Crc8Calculate(sub_buf);
       sub_buf_idx = 0;

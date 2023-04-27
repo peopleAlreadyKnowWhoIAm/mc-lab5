@@ -18,7 +18,7 @@ int8_t RS485MasterSendAddress(RS485* master, uint8_t address) {
 
 int8_t RS485Write(RS485* rs, const char* text) {
   char* tx = MCCGetBuffer(rs);
-  int8_t len = Crc8Encode(tx,text);
+  int8_t len = Crc8Encode(tx,text, strlen(text));
   if(len == 0 ){
     return -1;
   }
@@ -26,10 +26,21 @@ int8_t RS485Write(RS485* rs, const char* text) {
   return MCCWrite(rs, len);
 }
 
+int8_t RS485WriteBytes(RS485* rs, const uint8_t* data, const uint8_t len){
+  char* tx = MCCGetBuffer(rs);
+  uint8_t n_len = Crc8Encode(tx,data, len);
+  if(n_len == 0 ){
+    return -1;
+  }
+
+  return MCCWrite(rs, n_len);
+
+}
+
 int8_t RS485WriteWithError(RS485* rs, const char* text, int8_t error_byte, uint8_t error_mask){
 
   char* tx = MCCGetBuffer(rs);
-  int8_t len = Crc8Encode(tx,text);
+  int8_t len = Crc8Encode(tx,text, strlen(text));
   if(len == 0 ){
     return -1;
   }
@@ -56,7 +67,14 @@ int8_t RS485Read(RS485* mcc, char* output_buf) {
     return -1;
   }
 
+  if(len<10) {
+    GPIOC->PORT |= 0b001;
+  }
+
   uint8_t res_len = Crc8Decode(output_buf, buffer, len);
+  if(res_len<7) {
+    GPIOC->PORT |= _BV(res_len);
+  }
   return res_len;
 }
 

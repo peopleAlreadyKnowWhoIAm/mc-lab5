@@ -22,8 +22,7 @@ int main() {
         while (SPIBusy(spi)) {
         }
         PCF2123ReadTimeFinish(spi, (uint8_t*)buf);
-        buf[7] = 0;
-        RS485Write(rs, buf);
+        RS485WriteBytes(rs, buf, 7);
         break;
       case 's':
         PCF2123WriteTime(spi, (uint8_t*)&buf[1], &pin_clock);

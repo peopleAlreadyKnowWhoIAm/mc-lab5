@@ -18,6 +18,8 @@ int8_t RS485MasterSendAddress(RS485* master, uint8_t address);
 // Returns -1 on failure
 int8_t RS485Write(RS485* mcc, const char* text);
 
+int8_t RS485WriteBytes(RS485* rs, const uint8_t* data, const uint8_t len);
+
 int8_t RS485WriteWithError(RS485*mcc, const char* text, int8_t error_byte, uint8_t error_mask);
 // Returns -1 on busy
 // Returns -2 on receive fault

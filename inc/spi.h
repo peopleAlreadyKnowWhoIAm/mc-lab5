@@ -9,6 +9,7 @@
 
 #include <avr/io.h>
 #include <avr/interrupt.h>
+#include <avr/delay.h>
 
 typedef struct {
   SPIMemoryMapping* mapping;

@@ -40,6 +40,7 @@ static void send_data(SPI* spi) {
   if (spi->counter == spi->data_len - 1) {
     spi->buffer[spi->counter] = spi->mapping->spdr;
     spi->mapping->spcr &= ~_BV(SPIE);
+    _delay_ms(1);
     spi->slave_pin->gpio->PORT ^= _BV(spi->slave_pin->pin_number);
     
   } else {
